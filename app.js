@@ -265,11 +265,8 @@ class Router {
   renderHomePage() {
     return `
       <section>
-        <h2>Masterarbeit</h2>
-        <p>Willkommen. Diese Seite dokumentiert meine Masterarbeit und den Reflexionsprozess.</p>
-        <p>Erfahre mehr über mein <a href="#thesis">These</a> oder folge meinem <a href="#reflexion">Reflexions-Tagebuch</a>.</p>
-        <h3>Kontakt</h3>
-        <p>Interessiert an einer Zusammenarbeit oder möchtest Feedback geben? <a href="mailto:your-email@example.com">Schreib mir eine Email</a>.</p>
+                <p>Willkommen. Diese Seite dokumentiert meine Masterarbeit und den Reflexionsprozess.</p>
+        
       </section>
     `;
   }
