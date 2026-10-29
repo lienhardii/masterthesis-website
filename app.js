@@ -41,7 +41,9 @@ const app = {
 
   async loadManifest() {
     try {
-      const response = await fetch('./content-manifest.json');
+      // Use raw GitHub URL to load manifest
+      const rawUrl = `https://raw.githubusercontent.com/lienhardii/masterthesis-website/main/content-manifest.json`;
+      const response = await fetch(rawUrl);
       return await response.json();
     } catch (error) {
       console.error('Error loading manifest:', error);
@@ -81,8 +83,9 @@ const app = {
 
   async loadMarkdownFile(folder, filename) {
     try {
-      const url = `./${folder}/${filename}`;
-      const response = await fetch(url);
+      // Use raw GitHub URL to load .md files from repository
+      const rawUrl = `https://raw.githubusercontent.com/lienhardii/masterthesis-website/main/${folder}/${filename}`;
+      const response = await fetch(rawUrl);
       const text = await response.text();
       return this.parseMarkdown(text);
     } catch (error) {
@@ -265,18 +268,17 @@ const app = {
   },
 
   renderStartPage() {
-     let html = ''; // = '<div class="container">';
-
     
 
+
     // Render all thesis sections stacked (full-width)
-    html += '<div class="container">';
+    let html = '<div class="container">';
     if (this.content.thesis && this.content.thesis.length > 0) {
       html += renderThesisSections(this.content.thesis);
     } else {
       html += '<p>No thesis content yet. Add markdown files to /content/thesis/</p>';
     }
-    //html += '</div>';
+    html += '</div>';
 
     return html;
   },
@@ -284,9 +286,7 @@ const app = {
   renderReflexionPage() {
     let html = '<div class="container">';
 
-    
-
-    if (this.content.reflexion && this.content.reflexion.length > 0) {
+        if (this.content.reflexion && this.content.reflexion.length > 0) {
       html += renderBlogPostsList(this.content.reflexion);
     } else {
       html += '<p>Noch keine Reflexions-Einträge vorhanden.</p>';
@@ -298,7 +298,6 @@ const app = {
 
   renderAboutPage() {
     let html = '<div class="container">';
-
 
     html += '<p>Informationen über diese Masterarbeit und den Autor.</p>';
 
