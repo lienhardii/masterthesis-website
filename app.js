@@ -122,6 +122,8 @@ class ContentManager {
     const posts = [
       { id: 'first-thoughts', file: 'content/reflexion/2024-10-29-first-thoughts.md' },
       { id: 'update-nov', file: 'content/reflexion/2024-11-15-update.md' },
+      { id: 'test', file: 'content/reflexion/2026-10-29.md'},
+      { id: 'test-update', file: 'content/reflexion/2026-10-29-update.md'},
     ];
 
     for (const post of posts) {
