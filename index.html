@@ -3,31 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Masterarbeit – Forschung & Reflexion">
   <title>Masterarbeit</title>
+  
+  <!-- Google Fonts: Inclusive Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inclusive+Sans:ital@0;1&display=swap" rel="stylesheet">
+  
+  <!-- Pure.css CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/pure-min.css"
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/purecss@3.0.0/build/grids-responsive-min.css">
+  
+  <!-- Custom Stylesheet -->
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <header>
-    <div class="container">
-      <h1><a href="./">Masterarbeit</a></h1>
-      <nav id="main-nav">
-        <a href="/" class="nav-link" data-page="home">Start</a>
-        <a href="#thesis" class="nav-link" data-page="thesis-index">Thesis</a>
-        <a href="#reflexion" class="nav-link" data-page="reflexion-index">Reflexion</a>
-      </nav>
-    </div>
-  </header>
+  <div id="header-container"></div>
 
-  <main class="container">
-    <div id="content"></div>
+  <main id="content">
+    <!-- Content rendered here -->
   </main>
 
-  <footer>
-    <div class="container">
-      <p id="footer-text"></p>
-    </div>
-  </footer>
+  <div id="footer-container"></div>
 
+  <!-- Template Functions -->
+  <script src="./templates/header.js"></script>
+  <script src="./templates/section.js"></script>
+  <script src="./templates/blog-post.js"></script>
+  <script src="./templates/footer.js"></script>
+
+  <!-- Main Application -->
   <script src="./app.js"></script>
 </body>
 </html>

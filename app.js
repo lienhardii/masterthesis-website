@@ -1,321 +1,313 @@
-// Einfacher Markdown-Parser (ohne Dependencies)
-class MarkdownParser {
-  static parse(markdown) {
+const app = {
+  currentPage: 'start',
+  manifest: null,
+  content: {},
+
+  async init() {
+    console.log('🚀 Initializing app with Pure.css...');
+    
+    // Load manifest
+    this.manifest = await this.loadManifest();
+    console.log('📋 Manifest loaded:', this.manifest);
+
+    // Load all content files
+    await this.loadAllContent();
+
+    // Check URL hash for page to load
+    const hash = window.location.hash.slice(1); // Remove #
+    const validPages = ['reflexion', 'about'];
+    if (hash && validPages.includes(hash)) {
+      this.currentPage = hash;
+      console.log('📍 Loaded from hash:', hash);
+    }
+
+    // Render initial page
+    this.setCurrentPage(this.currentPage);
+
+    // Listen for hash changes (back/forward button)
+    window.addEventListener('hashchange', () => {
+      const newHash = window.location.hash.slice(1);
+      const validPages = ['reflexion', 'about'];
+      if (newHash && validPages.includes(newHash)) {
+        this.setCurrentPage(newHash);
+      } else if (!newHash) {
+        // Empty hash = Start page
+        this.setCurrentPage('start');
+      }
+    });
+
+    console.log('✅ App initialized');
+  },
+
+  async loadManifest() {
+    try {
+      const response = await fetch('./content-manifest.json');
+      return await response.json();
+    } catch (error) {
+      console.error('Error loading manifest:', error);
+      return { thesis: [], reflexion: [] };
+    }
+  },
+
+  async loadAllContent() {
+    // Initialize arrays (verhindert Duplikate bei mehrfachem Laden)
+    this.content = { thesis: [], reflexion: [] };
+
+    // Load thesis files
+    if (this.manifest.thesis) {
+      console.log('📚 Loading thesis files:', this.manifest.thesis);
+      for (const file of this.manifest.thesis) {
+        const content = await this.loadMarkdownFile('content/thesis', file);
+        this.content.thesis.push(content);
+      }
+      console.log('✅ Loaded thesis:', this.content.thesis.length, 'files');
+    }
+
+    // Load reflexion files
+    if (this.manifest.reflexion) {
+      console.log('📝 Loading reflexion files:', this.manifest.reflexion);
+      for (const file of this.manifest.reflexion) {
+        const content = await this.loadMarkdownFile('content/reflexion', file);
+        this.content.reflexion.push(content);
+      }
+      console.log('✅ Loaded reflexion:', this.content.reflexion.length, 'posts');
+    }
+
+    // Sort reflexion by date (newest first)
+    if (this.content.reflexion) {
+      this.content.reflexion.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+  },
+
+  async loadMarkdownFile(folder, filename) {
+    try {
+      const url = `./${folder}/${filename}`;
+      const response = await fetch(url);
+      const text = await response.text();
+      return this.parseMarkdown(text);
+    } catch (error) {
+      console.error(`Error loading ${filename}:`, error);
+      return { title: 'Error', content: 'File not found', meta: {} };
+    }
+  },
+
+  parseMarkdown(text) {
+    let meta = {};
+    let body = text;
+
+    const lines = text.split('\n');
+
+    // Check if text starts with --- (YAML frontmatter)
+    if (lines[0].trim() === '---') {
+      let frontmatterEnd = -1;
+
+      // Find closing ---
+      for (let i = 1; i < lines.length; i++) {
+        if (lines[i].trim() === '---') {
+          frontmatterEnd = i;
+          break;
+        }
+      }
+
+      if (frontmatterEnd > 0) {
+        // Extract frontmatter between --- and ---
+        const frontmatterLines = lines.slice(1, frontmatterEnd);
+
+        // Parse YAML frontmatter (key: value pairs)
+        frontmatterLines.forEach(line => {
+          if (line.trim()) {
+            const colonIndex = line.indexOf(':');
+            if (colonIndex > 0) {
+              const key = line.substring(0, colonIndex).trim();
+              const value = line.substring(colonIndex + 1).trim();
+
+              if (key && value) {
+                // Skip title - don't store or render meta.title
+                if (key.toLowerCase() === 'title') {
+                  // Do nothing - title is skipped
+                } else if (key.toLowerCase() === 'tags') {
+                  // Parse comma-separated tags
+                  meta.tags = value.split(',').map(t => t.trim()).filter(t => t);
+                } else {
+                  meta[key.toLowerCase()] = value;
+                }
+              }
+            }
+          }
+        });
+
+        // Extract body (everything after closing ---)
+        body = lines.slice(frontmatterEnd + 1).join('\n').trim();
+      }
+    } else {
+      console.warn('⚠️ Warning: No YAML frontmatter found. File must start with ---');
+    }
+
+    // Convert markdown to HTML
+    const html = this.markdownToHtml(body);
+
+    const result = {
+      title: meta.title || 'Untitled',
+      date: meta.date || new Date().toISOString().split('T')[0],
+      tags: meta.tags || [],
+      content: html,
+      meta: meta
+    };
+
+    console.log('📄 Parsed:', result.title, '|', result.date, '| Tags:', result.tags.length > 0 ? result.tags.join(', ') : 'none');
+
+    return result;
+  },
+
+  markdownToHtml(markdown) {
     let html = markdown;
 
-    // Headings (h2, h3, h4)
-    html = html.replace(/^### (.*?)$/gm, '<h4>$1</h4>');
-    html = html.replace(/^## (.*?)$/gm, '<h3>$1</h3>');
-    html = html.replace(/^# (.*?)$/gm, '<h2>$1</h2>');
+    // Escape HTML first
+    html = html.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;');
 
-    // Bold & Italic
+    // Headers
+    html = html.replace(/^### (.*?)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.*?)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.*?)$/gm, '<h1>$1</h1>');
+
+    // Bold and Italic
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-    html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
 
     // Links
-    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+    html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
 
-    // Code inline
+    // Inline code
     html = html.replace(/`(.*?)`/g, '<code>$1</code>');
 
-    // Blockquotes
+    // Blockquote
     html = html.replace(/^> (.*?)$/gm, '<blockquote>$1</blockquote>');
-
-    // Line breaks zu Paragraphen
-    html = html
-      .split('\n\n')
-      .map(block => {
-        if (block.match(/^<h[2-4]|^<blockquote|^<ul|^<ol|^<pre|^<code/)) {
-          return block;
-        }
-        if (block.trim() === '') return '';
-        return `<p>${block.trim()}</p>`;
-      })
-      .join('\n');
 
     // Lists
     html = html.replace(/^\* (.*?)$/gm, '<li>$1</li>');
-    html = html.replace(/(<li>.*?<\/li>)/s, '<ul>$1</ul>');
+    html = html.replace(/^- (.*?)$/gm, '<li>$1</li>');
     html = html.replace(/^\d+\. (.*?)$/gm, '<li>$1</li>');
 
+    // Wrap consecutive list items in ul
+    html = html.replace(/(<li>.*?<\/li>)/s, (match) => {
+      return '<ul>' + match + '</ul>';
+    });
+
     // Code blocks
-    html = html.replace(/```(.*?)```/s, '<pre><code>$1</code></pre>');
+    html = html.replace(/```(.*?)```/gs, (match, code) => {
+      const escaped = code.trim()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      return '<pre><code>' + escaped + '</code></pre>';
+    });
+
+    // Paragraphs
+    html = html.replace(/\n\n+/g, '</p><p>');
+    html = '<p>' + html + '</p>';
+
+    // Clean up empty tags
+    html = html.replace(/<p>\s*<(h|ul|pre|blockquote)/g, '<$1');
+    html = html.replace(/<\/(h|ul|pre|blockquote)>\s*<\/p>/g, '</$1>');
+    html = html.replace(/<p><\/p>/g, '');
+
+    // Decode HTML entities
+    html = html.replace(/&lt;/g, '<')
+               .replace(/&gt;/g, '>')
+               .replace(/&amp;/g, '&');
 
     return html;
-  }
-}
+  },
 
-// Content Manager
-class ContentManager {
-  constructor() {
-    this.pages = new Map();
-    this.thesis = [];
-    this.reflexion = [];
-  }
-
-  async loadMarkdownFile(path) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) return null;
-      return await response.text();
-    } catch (error) {
-      console.error('Error loading file:', path, error);
-      return null;
+  setCurrentPage(page) {
+    this.currentPage = page;
+    
+    // Update URL hash (but not for start page)
+    if (page === 'start') {
+      window.location.hash = '';
+    } else {
+      window.location.hash = page;
     }
-  }
+    
+    // Render header + content
+    renderHeader(page);
+    this.renderContent();
+    window.scrollTo(0, 0);
+  },
 
-  parseMetadata(content) {
-    const lines = content.split('\n');
-    const metadata = {};
-    let bodyStart = 0;
-
-    // Parse optional front matter (lines starting with key: value)
-    for (let i = 0; i < Math.min(10, lines.length); i++) {
-      if (lines[i].includes(':') && !lines[i].startsWith('#')) {
-        const [key, value] = lines[i].split(':').map(s => s.trim());
-        metadata[key.toLowerCase()] = value;
-      } else if (lines[i].trim() === '') {
-        bodyStart = i + 1;
-        break;
-      } else {
-        bodyStart = i;
-        break;
-      }
-    }
-
-    const body = lines.slice(bodyStart).join('\n');
-    return { metadata, body };
-  }
-
-  async loadThesisPages() {
-    // List of thesis pages - du kannst das updaten
-    const pages = [
-      { id: '01-intro', file: 'content/thesis/01-intro.md', title: 'Einführung' },
-      { id: '02-problem', file: 'content/thesis/02-problem.md', title: 'Problemstellung' },
-      { id: '03-method', file: 'content/thesis/03-method.md', title: 'Methodologie' },
-      { id: '04-results', file: 'content/thesis/04-results.md', title: 'Ergebnisse' },
-      { id: '05-conclusion', file: 'content/thesis/05-conclusion.md', title: 'Fazit' },
-    ];
-
-    for (const page of pages) {
-      const content = await this.loadMarkdownFile(page.file);
-      if (content) {
-        const { metadata, body } = this.parseMetadata(content);
-        this.thesis.push({
-          ...page,
-          metadata,
-          body,
-          html: MarkdownParser.parse(body),
-        });
-        this.pages.set(`thesis-${page.id}`, {
-          title: page.title,
-          content: this.generateThesisPageHTML(page.title, this.pages.size, body),
-        });
-      }
-    }
-  }
-
-  async loadReflexionPosts() {
-    // Beispiel: du kannst die Liste auch dynamisch laden
-    const posts = [
-      { id: 'first-thoughts', file: 'content/reflexion/2024-10-29-first-thoughts.md' },
-      { id: 'update-nov', file: 'content/reflexion/2024-11-15-update.md' },
-      { id: 'test', file: 'content/reflexion/2026-10-29.md'},
-      { id: 'test-update', file: 'content/reflexion/2026-10-29-update.md'},
-    ];
-
-    for (const post of posts) {
-      const content = await this.loadMarkdownFile(post.file);
-      if (content) {
-        const { metadata, body } = this.parseMetadata(content);
-        this.reflexion.push({
-          ...post,
-          metadata,
-          body,
-          html: MarkdownParser.parse(body),
-        });
-      }
-    }
-
-    // Sortiere nach Datum (neueste zuerst)
-    this.reflexion.sort((a, b) => {
-      const dateA = new Date(a.metadata.date || 0);
-      const dateB = new Date(b.metadata.date || 0);
-      return dateB - dateA;
-    });
-
-    this.pages.set('reflexion-index', {
-      title: 'Reflexion',
-      content: this.generateReflexionIndexHTML(),
-    });
-  }
-
-  generateThesisPageHTML(title, order, body) {
-    return `
-      <article>
-        <h2>${title}</h2>
-        ${MarkdownParser.parse(body)}
-        <nav class="chapter-nav">
-          <a href="#thesis">← Zurück zur These</a>
-        </nav>
-      </article>
-    `;
-  }
-
-  generateReflexionIndexHTML() {
-    const items = this.reflexion
-      .map(post => {
-        const date = post.metadata.date ? new Date(post.metadata.date).toLocaleDateString('de-DE') : '—';
-        const tags = post.metadata.tags ? post.metadata.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-        return `
-          <li class="index-item">
-            <h3><a href="#reflexion-${post.id}" class="index-link">${post.metadata.title || 'Untitled'}</a></h3>
-            <div class="item-meta">
-              <span class="post-date">${date}</span>
-              ${tags.length > 0 ? `<div class="post-tags">${tags.map(t => `<a href="#reflexion?tag=${t}" class="tag">#${t}</a>`).join('')}</div>` : ''}
-            </div>
-          </li>
-        `;
-      })
-      .join('');
-
-    return `
-      <section>
-        <h2>Reflexion</h2>
-        <p>Gedanken, Erkenntnisse und Fortschritt während der Masterarbeit.</p>
-        <ul class="index-list">
-          ${items}
-        </ul>
-      </section>
-    `;
-  }
-
-  generateThesisIndexHTML() {
-    const items = this.thesis
-      .map(page => `
-        <li class="index-item">
-          <h3><a href="#thesis-${page.id}" class="index-link">${page.title}</a></h3>
-        </li>
-      `)
-      .join('');
-
-    return `
-      <section>
-        <h2>These</h2>
-        <p>Überblick über die Masterarbeit in einzelnen Themen.</p>
-        <ul class="index-list">
-          ${items}
-        </ul>
-      </section>
-    `;
-  }
-}
-
-// Router
-class Router {
-  constructor(contentManager) {
-    this.contentManager = contentManager;
-    this.currentPage = 'home';
-  }
-
-  async route(page) {
-    const contentEl = document.getElementById('content');
+  renderContent() {
+    const contentDiv = document.getElementById('content');
     let html = '';
 
-    if (page === 'home') {
-      html = this.renderHomePage();
-    } else if (page === 'thesis-index') {
-      html = this.contentManager.generateThesisIndexHTML();
-    } else if (page === 'reflexion-index') {
-      html = this.contentManager.generateReflexionIndexHTML();
-    } else if (page.startsWith('thesis-')) {
-      const id = page.slice(7);
-      const thesisPage = this.contentManager.thesis.find(t => t.id === id);
-      if (thesisPage) {
-        html = this.contentManager.generateThesisPageHTML(thesisPage.title, 0, thesisPage.body);
-      }
-    } else if (page.startsWith('reflexion-')) {
-      const id = page.slice(10);
-      const post = this.contentManager.reflexion.find(r => r.id === id);
-      if (post) {
-        const date = post.metadata.date ? new Date(post.metadata.date).toLocaleDateString('de-DE') : '—';
-        const tags = post.metadata.tags ? post.metadata.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
-        html = `
-          <article>
-            <h2>${post.metadata.title || 'Untitled'}</h2>
-            <div class="post-meta">
-              <span class="post-date">${date}</span>
-              ${tags.length > 0 ? `<div class="post-tags">${tags.map(t => `<a href="#reflexion?tag=${t}" class="tag">#${t}</a>`).join('')}</div>` : ''}
-            </div>
-            ${post.html}
-            <nav class="chapter-nav">
-              <a href="#reflexion">← Zurück zur Reflexion</a>
-            </nav>
-          </article>
-        `;
-      }
+    if (this.currentPage === 'start') {
+      html = this.renderStartPage();
+    } else if (this.currentPage === 'reflexion') {
+      html = this.renderReflexionPage();
+    } else if (this.currentPage === 'about') {
+      html = this.renderAboutPage();
     }
 
-    contentEl.innerHTML = html;
-    this.updateNavigation(page);
-  }
+    // Clear old content completely
+    contentDiv.innerHTML = '';
+    contentDiv.innerHTML = html;
 
-  renderHomePage() {
-    return `
-      <section>
-        <h2>Masterarbeit</h2>
-        <p>Willkommen. Diese Seite dokumentiert meine Masterarbeit und den Reflexionsprozess.</p>
-        <p>Erfahre mehr über mein <a href="#thesis">These</a> oder folge meinem <a href="#reflexion">Reflexions-Tagebuch</a>.</p>
-        <h3>Kontakt</h3>
-        <p>Interessiert an einer Zusammenarbeit oder möchtest Feedback geben? <a href="mailto:your-email@example.com">Schreib mir eine Email</a>.</p>
-      </section>
-    `;
-  }
-
-  updateNavigation(page) {
-    document.querySelectorAll('.nav-link').forEach(link => {
-      link.classList.remove('active');
-      if (page === 'home' && link.dataset.page === 'home') {
-        link.classList.add('active');
-      } else if (page.startsWith('thesis') && link.dataset.page === 'thesis-index') {
-        link.classList.add('active');
-      } else if (page.startsWith('reflexion') && link.dataset.page === 'reflexion-index') {
-        link.classList.add('active');
-      }
+    // Re-attach event listeners for tags (nur wenn vorhanden)
+    document.querySelectorAll('.tag').forEach(tag => {
+      tag.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Tag clicked:', tag.dataset.tag);
+      });
     });
+  },
+
+  renderStartPage() {
+     let html = ''; // = '<div class="container">';
+
+    
+
+    // Render all thesis sections stacked (full-width)
+    html += '<div class="container">';
+    if (this.content.thesis && this.content.thesis.length > 0) {
+      html += renderThesisSections(this.content.thesis);
+    } else {
+      html += '<p>No thesis content yet. Add markdown files to /content/thesis/</p>';
+    }
+    //html += '</div>';
+
+    return html;
+  },
+
+  renderReflexionPage() {
+    let html = '<div class="container">';
+
+    
+
+    if (this.content.reflexion && this.content.reflexion.length > 0) {
+      html += renderBlogPostsList(this.content.reflexion);
+    } else {
+      html += '<p>Noch keine Reflexions-Einträge vorhanden.</p>';
+    }
+
+    html += '</div>';
+    return html;
+  },
+
+  renderAboutPage() {
+    let html = '<div class="container">';
+
+
+    html += '<p>Informationen über diese Masterarbeit und den Autor.</p>';
+
+    html += '</div>';
+    return html;
   }
-}
+};
 
-// App Initialization
-document.addEventListener('DOMContentLoaded', async () => {
-  const contentManager = new ContentManager();
-  const router = new Router(contentManager);
-
-  // Load all content
-  await contentManager.loadThesisPages();
-  await contentManager.loadReflexionPosts();
-
-  // Handle navigation
-  document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      router.route(link.dataset.page);
-    });
-  });
-
-  // Handle hash-based routing (für Links innerhalb des Contents)
-  window.addEventListener('hashchange', () => {
-    const hash = location.hash.slice(1) || 'home';
-    router.route(hash);
-  });
-
-  // Initial page load
-  const hash = location.hash.slice(1) || 'home';
-  router.route(hash);
-
-  // Footer
-  const year = new Date().getFullYear();
-  document.getElementById('footer-text').textContent = `© ${year} · Made with care`;
+// Initialize app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  app.init();
 });
